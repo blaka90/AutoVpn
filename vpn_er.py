@@ -6,10 +6,11 @@ import threading
 import subprocess
 import sys
 import pexpect
+import zipfile
+from time import sleep
 
 """
-
-make sure pidof returns proper pid in stop_vpn
+waiting for twitter api token, to implement grabbing password
 
 there twitter tweets when they change the password
 	-twitter api or scrape for passwords
@@ -21,17 +22,38 @@ current password: 533d2ve
 
 user = getpass.getuser()
 
-os.chdir("/home/" + user + "/Documents/python/vpn_er/")
-
 username = "vpnbook"
 
 cur_password = "533d2ve"
 
+vpn_pl = "VPNBook.com-OpenVPN-PL226.zip"
+vpn_de = "VPNBook.com-OpenVPN-DE4.zip"
+
+
+def path():
+	abspath = os.path.abspath(__file__)
+	dir_name = os.path.dirname(abspath)
+	os.chdir(dir_name)
+
 
 def get_profiles():
-	url = "https://www.vpnbook.com/free-openvpn-account/VPNBook.com-OpenVPN-PL226.zip"
-	wget.download(url)
-	os.system("unzip VPNBook*.zip")
+	if not os.path.isfile(vpn_pl):
+		url_pl = "https://www.vpnbook.com/free-openvpn-account/" + vpn_pl
+		wget.download(url_pl)
+	if not os.path.isfile(vpn_de):
+		url_de = "https://www.vpnbook.com/free-openvpn-account/" + vpn_de
+		wget.download(url_de)
+	sleep(1)
+	if os.path.isfile(vpn_pl) and not os.path.isfile("vpnbook-pl226-udp25000.ovpn"):
+		unzipper(vpn_pl)
+	if os.path.isfile(vpn_pl) and not os.path.isfile("vpnbook-de4-udp25000.ovpn"):
+		unzipper(vpn_de)
+
+
+def unzipper(fn):
+	zfile = zipfile.ZipFile(fn, 'r')
+	zfile.extractall()
+	zfile.close()
 
 
 def print_ip():
@@ -44,8 +66,8 @@ def print_ip():
 
 # this needs to be a thread
 def start_vpn(passy):
-	expect_passy = "[sudo] password for {}:".format(user)
-	shell = pexpect.spawn("sudo openvpn --config vpnbook-pl226-tcp443.ovpn")
+	shell = pexpect.spawn("sudo openvpn --config vpnbook-de4-udp25000.ovpn")
+	# shell = pexpect.spawn("sudo openvpn --config vpnbook-pl226-tcp443.ovpn")
 	shell.expect('.*password for .*?: ')
 	shell.sendline(passy)
 	shell.expect("Enter Auth Username:")
@@ -57,57 +79,40 @@ def start_vpn(passy):
 	cmd_output = cmd_show_data.split(b'\r\n')
 	for data in cmd_output:
 		print(data.decode())
-	"""
-	# os.system("openvpn --config vpnbook-pl226-tcp443.ovpn")
-	p = subprocess.Popen(["sudo", "openvpn", "--config", "vpnbook-pl226-tcp443.ovpn"])
-	#  stdin=subprocess.PIPE,
-	# 	                     stdout=subprocess.PIPE, stderr=subprocess.PIPE
-
-	out, err = p.communicate(input=username)
-	if out:
-		print(out.decode())
-	if err:
-		print(err.decode())
-	"""
 
 
 def stop_vpn(passy):
 	p_name = "openvpn"
-	p = subprocess.Popen(['pidof', p_name], stdout=subprocess.PIPE, shell=True)
-	result = p.communicate()[0].decode()
-	print(result)
-	shell = pexpect.spawn("sudo kill {}".format(result))
+	p = subprocess.Popen(['pidof', p_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	out, err = p.communicate()
+	shell = pexpect.spawn("sudo kill {}".format(out.decode()))
 	shell.expect('.*password for .*?: ')
 	shell.sendline(passy)
-	"""
-	try:
-		os.popen("sudo kill {}".format(p_name))
-		print('[*]killing pid: ' + str(p_name))
-	except Exception as e:
-		if "No such process" in e:
-			print(str(e))
-	"""
-	print("[*]--All processes killed--\n")
+	shell.expect(pexpect.EOF, timeout=None)
+	cmd_show_data = shell.before
+	cmd_output = cmd_show_data.split(b'\r\n')
+	for data in cmd_output:
+		print(data.decode())
+	print("\n[*]--VPN Process Killed--\n")
+	sys.exit(7)
 
 
 def main():
-	if not os.path.isfile("VPNBook.com-OpenVPN-PL226.zip"):
-		get_profiles()
+	path()
+	get_profiles()
 	print("\nCurrent ip:")
 	print_ip()
 	passy = getpass.getpass()
 	vpn = threading.Thread(target=start_vpn, args=[passy])
 	vpn.start()
+	print(vpn.ident)  # thread identifier, may come in handy later
 	# start_vpn(passy)
 	print("\nCurrent ip:")
 	print_ip()
 	print("\nscript is going to keep running until you type 'y' when finished!")
 	ans = input("finished?: ")
 	if ans == "y":
-		# os.system("rm VPNB*")
-		# os.system("rm vpnbook*")
 		stop_vpn(passy)
-		sys.exit(7)
 
 
 if __name__ == "__main__":
