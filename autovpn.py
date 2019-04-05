@@ -2,7 +2,6 @@ import os
 import wget
 import requests
 import getpass
-import threading
 import subprocess
 import sys
 import pexpect
@@ -14,12 +13,8 @@ from PyQt5.QtCore import *
 from PyQt5.QtTest import QTest
 
 """
-label to show ip
-button to refresh ip
 
 rename to AutoVpn
-
-need to start vpn as thread still
 
 waiting for twitter api token, to implement grabbing password
 
@@ -192,7 +187,7 @@ class Window(QWidget):
 	def print_ip(self):
 		my_ip = requests.get("http://ipecho.net/plain?")
 		if str(my_ip) == "<Response [200]>":
-			self.ip_label.setText("Current IP:   " + my_ip.text)
+			self.ip_label.setText("Current IP:        " + my_ip.text)
 			print("\nCurrent ip:\n")
 			print(my_ip.text)
 			print("\n")
