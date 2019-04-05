@@ -53,7 +53,7 @@ class Window(QWidget):
 		# set the name, icon and size of main window
 		self.setWindowTitle("AutoVpn")
 		# self.setWindowIcon(QIcon("resources/syncer.png"))
-		self.setGeometry(150, 100, 200, 100)
+		self.setGeometry(0, 0, 200, 100)
 		# self.setStyleSheet("background-color: black")
 
 		self.ip_label = QLabel(self)
