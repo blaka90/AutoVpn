@@ -1,7 +1,6 @@
 import os
 import wget
 import requests
-import getpass
 import subprocess
 import sys
 import pexpect
@@ -12,6 +11,11 @@ from PyQt5.QtCore import *
 from PyQt5.QtTest import QTest
 
 """
+sometimes hangs don't know why???
+	(might be the requeust for ip in print_ip?)
+	-removed some calls to print_ip hopefullys lessens the load
+
+create file for to save vpn password to and just edit that when needed 
 
 waiting for twitter api token, to implement grabbing password
 
@@ -29,6 +33,10 @@ class Window(QWidget):
 		super(Window, self).__init__()
 		self.vpn_pl = "VPNBook.com-OpenVPN-PL226.zip"
 		self.vpn_de = "VPNBook.com-OpenVPN-DE4.zip"
+		self.vpn_pl_list = ["vpnbook-pl226-tcp80.ovpn", "vpnbook-pl226-tcp443.ovpn", "vpnbook-pl226-udp53.ovpn",
+		                    "vpnbook-pl226-udp25000.ovpn"]
+		self.vpn_de_list = ["vpnbook-de4-tcp80.ovpn", "vpnbook-de4-tcp443.ovpn", "vpnbook-de4-udp53.ovpn",
+		           "vpnbook-de4-udp25000.ovpn"]
 		self.start_style()
 		self.path()
 		self.vpn_auth_name = "vpnbook"
@@ -141,10 +149,6 @@ class Window(QWidget):
 			sys.exit(10)
 
 	def get_profiles(self):
-		pl_list = ["vpnbook-pl226-tcp80.ovpn", "vpnbook-pl226-tcp443.ovpn", "vpnbook-pl226-udp53.ovpn",
-		           "vpnbook-pl226-udp25000.ovpn"]
-		de_list = ["vpnbook-de4-tcp80.ovpn", "vpnbook-de4-tcp443.ovpn", "vpnbook-de4-udp53.ovpn",
-		           "vpnbook-de4-udp25000.ovpn"]
 		if not os.path.isfile(self.vpn_pl):
 			url_pl = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_pl
 			wget.download(url_pl)
@@ -152,13 +156,13 @@ class Window(QWidget):
 			url_de = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_de
 			wget.download(url_de)
 		QTest.qWait(2000)
-		for p in pl_list:
+		for p in self.vpn_pl_list:
 			if not os.path.isfile(p):
 				self.unzipper(self.vpn_pl)
 				break
 			else:
 				continue
-		for d in de_list:
+		for d in self.vpn_de_list:
 			if not os.path.isfile(d):
 				self.unzipper(self.vpn_de)
 				break
@@ -168,22 +172,22 @@ class Window(QWidget):
 	def get_vpn_options(self):
 		if self.pl.isChecked():
 			if self.tcp80.isChecked():
-				self.type_vpn = "vpnbook-pl226-tcp80.ovpn"
+				self.type_vpn = self.vpn_pl_list[0]
 			elif self.tcp443.isChecked():
-				self.type_vpn = "vpnbook-pl226-tcp443.ovpn"
+				self.type_vpn = self.vpn_pl_list[1]
 			elif self.udp53.isChecked():
-				self.type_vpn = "vpnbook-pl226-udp53.ovpn"
+				self.type_vpn = self.vpn_pl_list[2]
 			elif self.udp25000.isChecked():
-				self.type_vpn = "vpnbook-pl226-udp25000.ovpn"
+				self.type_vpn = self.vpn_pl_list[3]
 		elif self.de.isChecked():
 			if self.tcp80.isChecked():
-				self.type_vpn = "vpnbook-de4-tcp80.ovpn"
+				self.type_vpn = self.vpn_de_list[0]
 			elif self.tcp443.isChecked():
-				self.type_vpn = "vpnbook-de4-tcp443.ovpn"
+				self.type_vpn = self.vpn_de_list[1]
 			elif self.udp53.isChecked():
-				self.type_vpn = "vpnbook-de4-udp53.ovpn"
+				self.type_vpn = self.vpn_de_list[2]
 			elif self.udp25000.isChecked():
-				self.type_vpn = "vpnbook-de4-udp25000.ovpn"
+				self.type_vpn = self.vpn_de_list[3]
 
 	@staticmethod
 	def unzipper(fn):
@@ -208,7 +212,6 @@ class Window(QWidget):
 		startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
 		startv.signals.printer.connect(self.print_ip)
 		self.thread.start(startv)
-		self.print_ip()
 
 	def stop_vpn(self):
 		self.vpn_off.setStyleSheet('background-color: green; color: black')
@@ -216,7 +219,6 @@ class Window(QWidget):
 		stopv = StopVpn(self.password)
 		stopv.signals.printer.connect(self.print_ip)
 		self.thread.start(stopv)
-		self.print_ip()
 
 
 class WorkerSignals(QObject):
