@@ -6,7 +6,6 @@ import subprocess
 import sys
 import pexpect
 import zipfile
-from time import sleep
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -32,11 +31,10 @@ class Window(QWidget):
 		self.vpn_de = "VPNBook.com-OpenVPN-DE4.zip"
 		self.start_style()
 		self.path()
-		self.get_profiles()
-		self.user = getpass.getuser()
 		self.vpn_auth_name = "vpnbook"
 		self.vpn_auth_password = "533d2ve"
 		self.password = self.get_password()
+		self.get_profiles()
 		self.init_ui()
 		self.print_ip()
 		self.type_vpn = ""
@@ -126,8 +124,7 @@ class Window(QWidget):
 		dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
 		dark_palette.setColor(QPalette.HighlightedText, Qt.black)
 		qApp.setPalette(dark_palette)
-		qApp.setStyleSheet("QToolTip { color: #ffffff; background-color: "
-		                   "#2a82da; border: 1px solid white; }")
+		qApp.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
 	@staticmethod
 	def path():
@@ -144,17 +141,29 @@ class Window(QWidget):
 			sys.exit(10)
 
 	def get_profiles(self):
+		pl_list = ["vpnbook-pl226-tcp80.ovpn", "vpnbook-pl226-tcp443.ovpn", "vpnbook-pl226-udp53.ovpn",
+		           "vpnbook-pl226-udp25000.ovpn"]
+		de_list = ["vpnbook-de4-tcp80.ovpn", "vpnbook-de4-tcp443.ovpn", "vpnbook-de4-udp53.ovpn",
+		           "vpnbook-de4-udp25000.ovpn"]
 		if not os.path.isfile(self.vpn_pl):
 			url_pl = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_pl
 			wget.download(url_pl)
 		if not os.path.isfile(self.vpn_de):
 			url_de = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_de
 			wget.download(url_de)
-		sleep(1)
-		if os.path.isfile(self.vpn_pl) and not os.path.isfile("vpnbook-pl226-udp25000.ovpn"):
-			self.unzipper(self.vpn_pl)
-		if os.path.isfile(self.vpn_pl) and not os.path.isfile("vpnbook-de4-udp25000.ovpn"):
-			self.unzipper(self.vpn_de)
+		QTest.qWait(2000)
+		for p in pl_list:
+			if not os.path.isfile(p):
+				self.unzipper(self.vpn_pl)
+				break
+			else:
+				continue
+		for d in de_list:
+			if not os.path.isfile(d):
+				self.unzipper(self.vpn_de)
+				break
+			else:
+				continue
 
 	def get_vpn_options(self):
 		if self.pl.isChecked():
@@ -257,7 +266,7 @@ class StartVpn(QRunnable):
 		shell.sendline(self.vpn_auth_name)
 		shell.expect("Enter Auth Password:")
 		shell.sendline(self.vpn_auth_password)
-		QTest.qWait(8000)
+		QTest.qWait(10000)
 		self.signals.printer.emit()
 		shell.expect(pexpect.EOF, timeout=None)
 		cmd_show_data = shell.before
