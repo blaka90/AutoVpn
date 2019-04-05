@@ -14,8 +14,6 @@ from PyQt5.QtTest import QTest
 
 """
 
-rename to AutoVpn
-
 waiting for twitter api token, to implement grabbing password
 
 there twitter tweets when they change the password
@@ -266,25 +264,6 @@ class StartVpn(QRunnable):
 		cmd_output = cmd_show_data.split(b'\r\n')
 		for data in cmd_output:
 			print(data.decode())
-
-"""
-def main():
-	path()
-	get_profiles()
-	printer("\nCurrent ip:")
-	print_ip()
-	passy = getpass.getpass()
-	vpn = threading.Thread(target=start_vpn, args=[passy])
-	vpn.start()
-	printer(vpn.ident)  # thread identifier, may come in handy later
-	# start_vpn(passy)
-	printer("\nCurrent ip:")
-	print_ip()
-	printer("\nscript is going to keep running until you type 'y' when finished!")
-	ans = input("finished?: ")
-	if ans == "y":
-		stop_vpn(passy)
-		"""
 
 
 def main():
