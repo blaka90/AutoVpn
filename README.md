@@ -8,7 +8,7 @@ Linux only
 
 Installation:
 
-    sudo apt install openvpn
+    sudo apt install openvpn python-pyqt5
 
 (or you're distros equivalent)
 
