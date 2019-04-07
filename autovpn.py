@@ -36,7 +36,7 @@ class Window(QWidget):
 		self.vpn_pl_list = ["vpnbook-pl226-tcp80.ovpn", "vpnbook-pl226-tcp443.ovpn", "vpnbook-pl226-udp53.ovpn",
 		                    "vpnbook-pl226-udp25000.ovpn"]
 		self.vpn_de_list = ["vpnbook-de4-tcp80.ovpn", "vpnbook-de4-tcp443.ovpn", "vpnbook-de4-udp53.ovpn",
-		           "vpnbook-de4-udp25000.ovpn"]
+		                    "vpnbook-de4-udp25000.ovpn"]
 		self.start_style()
 		self.path()
 		self.vpn_auth_name = "vpnbook"
@@ -47,6 +47,8 @@ class Window(QWidget):
 		self.print_ip()
 		self.type_vpn = ""
 		self.thread = QThreadPool()
+		self.file_picked = False
+		self.no_go = False
 
 	# initilize the user interface
 	def init_ui(self):
@@ -60,13 +62,18 @@ class Window(QWidget):
 
 		self.refresh_ip = QPushButton("refresh")
 		self.refresh_ip.clicked.connect(self.print_ip)
+		self.refresh_ip.setFixedWidth(200)
+
+		self.file_brow = QPushButton("Choose")
+		self.file_brow.clicked.connect(self.chooser)
+		self.file_brow.setFixedWidth(100)
 
 		self.pl = QRadioButton("Poland")
-		self.pl.setChecked(True)
+		# self.pl.setChecked(True)
 		self.de = QRadioButton("Germany")
 
 		self.tcp80 = QRadioButton("tcp80")
-		self.tcp80.setChecked(True)
+		# self.tcp80.setChecked(True)
 		self.tcp443 = QRadioButton("tcp443")
 		self.udp53 = QRadioButton("udp53")
 		self.udp25000 = QRadioButton("udp25000")
@@ -97,6 +104,10 @@ class Window(QWidget):
 		h_radio.addWidget(self.pl)
 		h_radio.addWidget(self.de)
 
+		h_buttons = QHBoxLayout()
+		h_buttons.addWidget(self.refresh_ip)
+		h_buttons.addWidget(self.file_brow)
+
 		h_radio_types = QHBoxLayout()
 		h_radio_types.addWidget(self.tcp80)
 		h_radio_types.addWidget(self.tcp443)
@@ -105,7 +116,7 @@ class Window(QWidget):
 
 		v_box = QVBoxLayout()
 		v_box.addWidget(self.ip_label)
-		v_box.addWidget(self.refresh_ip)
+		v_box.addLayout(h_buttons)
 		v_box.addLayout(h_radio)
 		v_box.addLayout(h_radio_types)
 		v_box.addLayout(h_box)
@@ -169,6 +180,14 @@ class Window(QWidget):
 			else:
 				continue
 
+	def chooser(self):
+		self.brow = MyFileBrowser()
+		self.brow.sig.return_data.connect(self.return_file_path)
+
+	def return_file_path(self, fp):
+		self.file_picked = True
+		self.type_vpn = fp
+
 	def get_vpn_options(self):
 		if self.pl.isChecked():
 			if self.tcp80.isChecked():
@@ -179,6 +198,7 @@ class Window(QWidget):
 				self.type_vpn = self.vpn_pl_list[2]
 			elif self.udp25000.isChecked():
 				self.type_vpn = self.vpn_pl_list[3]
+			self.no_go = False
 		elif self.de.isChecked():
 			if self.tcp80.isChecked():
 				self.type_vpn = self.vpn_de_list[0]
@@ -188,6 +208,10 @@ class Window(QWidget):
 				self.type_vpn = self.vpn_de_list[2]
 			elif self.udp25000.isChecked():
 				self.type_vpn = self.vpn_de_list[3]
+			self.no_go = False
+		else:
+			self.no_go = True
+			return self.no_go
 
 	@staticmethod
 	def unzipper(fn):
@@ -196,24 +220,36 @@ class Window(QWidget):
 		zfile.close()
 
 	def print_ip(self):
-		my_ip = requests.get("http://ipecho.net/plain?")
+		my_ip = requests.get("https://api.ipify.org")
 		if str(my_ip) == "<Response [200]>":
 			self.ip_label.setText("Current IP:        " + my_ip.text)
 			print("\nCurrent ip:\n")
 			print(my_ip.text)
 			print("\n")
+		else:
+			print("trying second option")
+			my_ip = requests.get("http://ipecho.net/plain?")
+			if str(my_ip) == "<Response [200]>":
+				self.ip_label.setText("Current IP:        " + my_ip.text)
+				print("\nCurrent ip:\n")
+				print(my_ip.text)
+				print("\n")
 
 	# this needs to be a thread
 	def start_vpn(self):
+		if not self.file_picked:
+			self.get_vpn_options()
+		if self.no_go:
+			return
 		self.vpn_on.setStyleSheet('background-color: green; color: black')
 		self.vpn_off.setStyleSheet('background-color: darkred; color: black')
-		self.get_vpn_options()
 		command = "sudo openvpn --config " + self.type_vpn
 		startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
 		startv.signals.printer.connect(self.print_ip)
 		self.thread.start(startv)
 
 	def stop_vpn(self):
+		self.file_picked = False
 		self.vpn_off.setStyleSheet('background-color: green; color: black')
 		self.vpn_on.setStyleSheet('background-color: darkred; color: black')
 		stopv = StopVpn(self.password)
@@ -275,6 +311,47 @@ class StartVpn(QRunnable):
 		cmd_output = cmd_show_data.split(b'\r\n')
 		for data in cmd_output:
 			print(data.decode())
+
+
+class BrowserSignal(QObject):
+	return_data = pyqtSignal(str)
+
+
+# class for opening/showing a file browser to choose path instead of typing it manually
+class MyFileBrowser(QWidget):
+
+	def __init__(self):
+		QWidget.__init__(self)
+		self.view = QTreeView()  # for displaying the FileSystemModel in a TreeView
+		self.sig = BrowserSignal()  # signal for passing data back to main window
+		self.setWindowTitle("Choose vpn profile")
+		self.path = "/"
+		self.file_path = ""
+		self.model = QFileSystemModel()  # the file file system model creation
+		self.model.setRootPath(QDir.rootPath())  # we want to start from root
+		self.setGeometry(320, 200, 1000, 600)
+		self.view.setModel(self.model)  # puts the file system model into the tree view
+		self.view.setRootIndex(self.model.index(self.path))  # set the indexes
+		self.view.setSortingEnabled(True)  # give the option to sort on header click
+		self.view.setColumnWidth(0, 610)
+		self.view.sortByColumn(0, Qt.AscendingOrder)
+		self.open_button = QPushButton("Open", self)  # pushed when file path is chosen and sends signal
+		self.open_button.clicked.connect(self.return_path)
+		self.open_button.setFixedWidth(200)
+		self.open_button.setStyleSheet("background-color: darkgray; color: black")
+
+		self.v_box = QVBoxLayout()
+		self.v_box.addWidget(self.view)
+		self.v_box.addWidget(self.open_button, alignment=Qt.AlignCenter)
+		self.setLayout(self.v_box)
+		self.show()
+
+	# when filepath is chosen and open button is pressed return path to correlating input box in main window and close
+	def return_path(self):
+		fp = self.view.selectedIndexes()[0]
+		self.file_path = self.model.filePath(fp)
+		self.sig.return_data.emit(self.file_path)
+		self.close()
 
 
 def main():
