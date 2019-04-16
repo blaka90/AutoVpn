@@ -2,3 +2,4 @@ PyQt5
 pexpect
 requests
 wget
+requests_html
