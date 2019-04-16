@@ -9,23 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtTest import QTest
-
-"""
-sometimes hangs don't know why???
-	(might be the requeust for ip in print_ip?)
-	-removed some calls to print_ip hopefullys lessens the load
-
-create file for to save vpn password to and just edit that when needed 
-
-waiting for twitter api token, to implement grabbing password
-
-there twitter tweets when they change the password
-	-twitter api or scrape for passwords
-		-tweetpy
-		
-current password: 533d2ve
-
-"""
+from twitter_scraper import get_tweets
 
 
 class Window(QWidget):
@@ -40,7 +24,7 @@ class Window(QWidget):
 		self.start_style()
 		self.path()
 		self.vpn_auth_name = "vpnbook"
-		self.vpn_auth_password = "533d2ve"
+		self.vpn_auth_password = self.grab_password()
 		self.password = self.get_password()
 		self.get_profiles()
 		self.init_ui()
@@ -49,14 +33,14 @@ class Window(QWidget):
 		self.thread = QThreadPool()
 		self.file_picked = False
 		self.no_go = False
+		self.vpn_state = False
 
 	# initilize the user interface
 	def init_ui(self):
 		# set the name, icon and size of main window
 		self.setWindowTitle("AutoVpn")
-		# self.setWindowIcon(QIcon("resources/syncer.png"))
+		# self.setWindowIcon(QIcon(".png"))
 		self.setGeometry(0, 0, 200, 100)
-		# self.setStyleSheet("background-color: black")
 
 		self.ip_label = QLabel(self)
 
@@ -69,11 +53,9 @@ class Window(QWidget):
 		self.file_brow.setFixedWidth(100)
 
 		self.pl = QRadioButton("Poland")
-		# self.pl.setChecked(True)
 		self.de = QRadioButton("Germany")
 
 		self.tcp80 = QRadioButton("tcp80")
-		# self.tcp80.setChecked(True)
 		self.tcp443 = QRadioButton("tcp443")
 		self.udp53 = QRadioButton("udp53")
 		self.udp25000 = QRadioButton("udp25000")
@@ -84,21 +66,14 @@ class Window(QWidget):
 		self.conn_types.addButton(self.udp53)
 		self.conn_types.addButton(self.udp25000)
 
-		self.vpn_on = QPushButton("ON")
-		self.vpn_on.setCheckable(True)
-		self.vpn_on.setStyleSheet('color: black')
-		self.vpn_on.setFixedWidth(100)
-		self.vpn_on.clicked.connect(self.start_vpn)
-
-		self.vpn_off = QPushButton("OFF")
-		self.vpn_off.setCheckable(True)
-		self.vpn_off.setStyleSheet('color: black')
-		self.vpn_off.setFixedWidth(100)
-		self.vpn_off.clicked.connect(self.stop_vpn)
+		self.vpn_button = QPushButton("VPN: OFF")
+		self.vpn_button.setStyleSheet('color: black')
+		self.vpn_button.setFixedHeight(40)
+		self.vpn_button.setFixedWidth(200)
+		self.vpn_button.clicked.connect(self.start_vpn)
 
 		h_box = QHBoxLayout()
-		h_box.addWidget(self.vpn_on)
-		h_box.addWidget(self.vpn_off)
+		h_box.addWidget(self.vpn_button)
 
 		h_radio = QHBoxLayout()
 		h_radio.addWidget(self.pl)
@@ -122,6 +97,15 @@ class Window(QWidget):
 		v_box.addLayout(h_box)
 
 		self.setLayout(v_box)
+
+	def grab_password(self):
+		for tweet in get_tweets('vpnbook', pages=1):
+			if tweet['text'].startswith("VPN password updated"):
+				self.vpn_auth_password = tweet['text'][-7:]
+				break
+
+		print(self.vpn_auth_password)
+		return self.vpn_auth_password
 
 	@staticmethod
 	def start_style():
@@ -237,24 +221,28 @@ class Window(QWidget):
 
 	# this needs to be a thread
 	def start_vpn(self):
-		if not self.file_picked:
-			self.get_vpn_options()
-		if self.no_go:
-			return
-		self.vpn_on.setStyleSheet('background-color: green; color: black')
-		self.vpn_off.setStyleSheet('background-color: darkred; color: black')
-		command = "sudo openvpn --config " + self.type_vpn
-		startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
-		startv.signals.printer.connect(self.print_ip)
-		self.thread.start(startv)
-
-	def stop_vpn(self):
-		self.file_picked = False
-		self.vpn_off.setStyleSheet('background-color: green; color: black')
-		self.vpn_on.setStyleSheet('background-color: darkred; color: black')
-		stopv = StopVpn(self.password)
-		stopv.signals.printer.connect(self.print_ip)
-		self.thread.start(stopv)
+		if not self.vpn_state:
+			if not self.file_picked:
+				self.get_vpn_options()
+			if self.no_go:
+				return
+			self.vpn_button.setText("VPN: ON")
+			self.vpn_button.setStyleSheet('background-color: green; color: black')
+			# self.vpn_off.setStyleSheet('background-color: darkred; color: black')
+			command = "sudo openvpn --config " + self.type_vpn
+			startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
+			startv.signals.printer.connect(self.print_ip)
+			self.thread.start(startv)
+			self.vpn_state = True
+		else:
+			self.file_picked = False
+			# self.vpn_off.setStyleSheet('background-color: green; color: black')
+			self.vpn_button.setText("VPN: OFF")
+			self.vpn_button.setStyleSheet('background-color: darkred; color: black')
+			stopv = StopVpn(self.password)
+			stopv.signals.printer.connect(self.print_ip)
+			self.thread.start(stopv)
+			self.vpn_state = False
 
 
 class WorkerSignals(QObject):
