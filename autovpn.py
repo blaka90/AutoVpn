@@ -102,12 +102,6 @@ class Window(QWidget):
 		h_radio = QHBoxLayout()
 		h_radio.addWidget(p2p)
 		h_radio.addWidget(no_p2p)
-		#h_radio.addWidget(self.pl)
-		#h_radio.addWidget(self.de)
-		#h_radio.addWidget(self.us1)
-		#h_radio.addWidget(self.us2)
-		#h_radio.addWidget(self.ca)
-		#h_radio.addWidget(self.fr)
 
 		h_buttons = QHBoxLayout()
 		h_buttons.addWidget(self.refresh_ip)
@@ -120,7 +114,6 @@ class Window(QWidget):
 		h_radio_types.addWidget(self.udp25000)
 
 		country_box = QGroupBox("Select Country:")
-		# country_box.setStyleSheet("color: black")
 		country_box.setLayout(h_radio)
 
 		connection_box = QGroupBox("Select Connection Type:")
