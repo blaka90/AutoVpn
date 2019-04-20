@@ -17,10 +17,14 @@ class Window(QWidget):
 		super(Window, self).__init__()
 		self.vpn_pl = "VPNBook.com-OpenVPN-PL226.zip"
 		self.vpn_de = "VPNBook.com-OpenVPN-DE4.zip"
-		self.vpn_pl_list = ["vpnbook-pl226-tcp80.ovpn", "vpnbook-pl226-tcp443.ovpn", "vpnbook-pl226-udp53.ovpn",
-		                    "vpnbook-pl226-udp25000.ovpn"]
-		self.vpn_de_list = ["vpnbook-de4-tcp80.ovpn", "vpnbook-de4-tcp443.ovpn", "vpnbook-de4-udp53.ovpn",
-		                    "vpnbook-de4-udp25000.ovpn"]
+		self.vpn_us1 = "VPNBook.com-OpenVPN-US1.zip"
+		self.vpn_us2 = "VPNBook.com-OpenVPN-US2.zip"
+		self.vpn_ca = "VPNBook.com-OpenVPN-CA222.zip"
+		self.vpn_fr = "VPNBook.com-OpenVPN-FR1.zip"
+		self.vpn_list = [self.vpn_pl, self.vpn_de, self.vpn_us1, self.vpn_us2, self.vpn_ca, self.vpn_fr]
+		self.gen_list = ["vpnbook-pl226-", "vpnbook-de4-", "vpnbook-us1-", "vpnbook-us2-", "vpnbook-ca222-", "vpnbook-fr1-"]
+		self.vpn_gen_list = ["tcp80.ovpn", "tcp443.ovpn", "udp53.ovpn", "udp25000.ovpn"]
+
 		self.start_style()
 		self.path()
 		self.vpn_auth_name = "vpnbook"
@@ -29,7 +33,7 @@ class Window(QWidget):
 		self.get_profiles()
 		self.init_ui()
 		self.print_ip()
-		self.type_vpn = ""
+		self.chosen_vpn = ""
 		self.thread = QThreadPool()
 		self.file_picked = False
 		self.no_go = False
@@ -54,6 +58,10 @@ class Window(QWidget):
 
 		self.pl = QRadioButton("Poland")
 		self.de = QRadioButton("Germany")
+		self.us1 = QRadioButton("USA1")
+		self.us2 = QRadioButton("USA2")
+		self.ca = QRadioButton("Canada")
+		self.fr = QRadioButton("France")
 
 		self.tcp80 = QRadioButton("tcp80")
 		self.tcp443 = QRadioButton("tcp443")
@@ -75,9 +83,31 @@ class Window(QWidget):
 		h_box = QHBoxLayout()
 		h_box.addWidget(self.vpn_button)
 
+		p2p_box = QHBoxLayout()
+		p2p_box.addWidget(self.pl)
+		p2p_box.addWidget(self.de)
+
+		p2p = QGroupBox("P2P:")
+		p2p.setLayout(p2p_box)
+
+		no_p2p_box = QHBoxLayout()
+		no_p2p_box.addWidget(self.us1)
+		no_p2p_box.addWidget(self.us2)
+		no_p2p_box.addWidget(self.ca)
+		no_p2p_box.addWidget(self.fr)
+
+		no_p2p = QGroupBox("No P2P/ Web Surfing Only:")
+		no_p2p.setLayout(no_p2p_box)
+
 		h_radio = QHBoxLayout()
-		h_radio.addWidget(self.pl)
-		h_radio.addWidget(self.de)
+		h_radio.addWidget(p2p)
+		h_radio.addWidget(no_p2p)
+		#h_radio.addWidget(self.pl)
+		#h_radio.addWidget(self.de)
+		#h_radio.addWidget(self.us1)
+		#h_radio.addWidget(self.us2)
+		#h_radio.addWidget(self.ca)
+		#h_radio.addWidget(self.fr)
 
 		h_buttons = QHBoxLayout()
 		h_buttons.addWidget(self.refresh_ip)
@@ -89,11 +119,18 @@ class Window(QWidget):
 		h_radio_types.addWidget(self.udp53)
 		h_radio_types.addWidget(self.udp25000)
 
+		country_box = QGroupBox("Select Country:")
+		# country_box.setStyleSheet("color: black")
+		country_box.setLayout(h_radio)
+
+		connection_box = QGroupBox("Select Connection Type:")
+		connection_box.setLayout(h_radio_types)
+
 		v_box = QVBoxLayout()
 		v_box.addWidget(self.ip_label)
 		v_box.addLayout(h_buttons)
-		v_box.addLayout(h_radio)
-		v_box.addLayout(h_radio_types)
+		v_box.addWidget(country_box)
+		v_box.addWidget(connection_box)
 		v_box.addLayout(h_box)
 
 		self.setLayout(v_box)
@@ -129,11 +166,10 @@ class Window(QWidget):
 		qApp.setPalette(dark_palette)
 		qApp.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
-	@staticmethod
-	def path():
+	def path(self):
 		abspath = os.path.abspath(__file__)
-		dir_name = os.path.dirname(abspath)
-		os.chdir(dir_name)
+		self.dir_name = os.path.dirname(abspath)
+		os.chdir(self.dir_name)
 
 	def get_password(self):
 		ask_pass, ok_pressed = QInputDialog.getText(self, "VPN Authorization", "Sudo Password: ", QLineEdit.Password, "")
@@ -144,25 +180,18 @@ class Window(QWidget):
 			sys.exit(10)
 
 	def get_profiles(self):
-		if not os.path.isfile(self.vpn_pl):
-			url_pl = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_pl
-			wget.download(url_pl)
-		if not os.path.isfile(self.vpn_de):
-			url_de = "https://www.vpnbook.com/free-openvpn-account/" + self.vpn_de
-			wget.download(url_de)
-		QTest.qWait(2000)
-		for p in self.vpn_pl_list:
-			if not os.path.isfile(p):
-				self.unzipper(self.vpn_pl)
-				break
-			else:
-				continue
-		for d in self.vpn_de_list:
-			if not os.path.isfile(d):
-				self.unzipper(self.vpn_de)
-				break
-			else:
-				continue
+		for pro in self.vpn_list:
+			if not os.path.isfile(self.dir_name + "/profiles/" + pro):
+				url_pl = "https://www.vpnbook.com/free-openvpn-account/" + pro
+				wget.download(url_pl, self.dir_name + "/profiles/")
+		# QTest.qWait(2000)
+		for vn, vz in zip(self.gen_list, self.vpn_list):
+			for vt in self.vpn_gen_list:
+				if not os.path.isfile(self.dir_name + "/profiles/" + vn + vt):
+					self.unzipper(self.dir_name + "/profiles/" + vz)
+					break
+				else:
+					continue
 
 	def chooser(self):
 		self.brow = MyFileBrowser()
@@ -170,37 +199,31 @@ class Window(QWidget):
 
 	def return_file_path(self, fp):
 		self.file_picked = True
-		self.type_vpn = fp
+		self.chosen_vpn = fp
 
 	def get_vpn_options(self):
-		if self.pl.isChecked():
-			if self.tcp80.isChecked():
-				self.type_vpn = self.vpn_pl_list[0]
-			elif self.tcp443.isChecked():
-				self.type_vpn = self.vpn_pl_list[1]
-			elif self.udp53.isChecked():
-				self.type_vpn = self.vpn_pl_list[2]
-			elif self.udp25000.isChecked():
-				self.type_vpn = self.vpn_pl_list[3]
-			self.no_go = False
-		elif self.de.isChecked():
-			if self.tcp80.isChecked():
-				self.type_vpn = self.vpn_de_list[0]
-			elif self.tcp443.isChecked():
-				self.type_vpn = self.vpn_de_list[1]
-			elif self.udp53.isChecked():
-				self.type_vpn = self.vpn_de_list[2]
-			elif self.udp25000.isChecked():
-				self.type_vpn = self.vpn_de_list[3]
-			self.no_go = False
-		else:
-			self.no_go = True
-			return self.no_go
+		pro_list = [self.pl, self.de, self.us1, self.us2, self.ca, self.fr]
+		conn_list = [self.tcp80, self.tcp443, self.udp53, self.udp25000]
+		country_num = 0
+		for country in pro_list:
+			connection_num = 0
+			if country.isChecked():
+				self.no_go = False
+				for con in conn_list:
+					if con.isChecked():
+						self.no_go = False
+						self.chosen_vpn = self.gen_list[country_num] + self.vpn_gen_list[connection_num]
+						return
 
-	@staticmethod
-	def unzipper(fn):
+					connection_num += 1
+					self.no_go = True
+
+			country_num += 1
+			self.no_go = True
+
+	def unzipper(self, fn):
 		zfile = zipfile.ZipFile(fn, 'r')
-		zfile.extractall()
+		zfile.extractall(path=self.dir_name+"/profiles/")
 		zfile.close()
 
 	def print_ip(self):
@@ -229,7 +252,8 @@ class Window(QWidget):
 			self.vpn_button.setText("VPN: ON")
 			self.vpn_button.setStyleSheet('background-color: green; color: black')
 			# self.vpn_off.setStyleSheet('background-color: darkred; color: black')
-			command = "sudo openvpn --config " + self.type_vpn
+			command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
+			print(command)
 			startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
 			startv.signals.printer.connect(self.print_ip)
 			self.thread.start(startv)
