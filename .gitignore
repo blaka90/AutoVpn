@@ -1,4 +1,4 @@
 .idea/
-VPNBook*
-vpnbook*
 __pycache__
+/profiles/vpnbook*
+/profiles/VPNBook*
