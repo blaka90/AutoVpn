@@ -180,6 +180,8 @@ class Window(QWidget):
 			sys.exit(10)
 
 	def get_profiles(self):
+		if not os.path.exists(self.dir_name + "/profiles/"):
+			os.mkdir(self.dir_name + "/profiles/")
 		for pro in self.vpn_list:
 			if not os.path.isfile(self.dir_name + "/profiles/" + pro):
 				url_pl = "https://www.vpnbook.com/free-openvpn-account/" + pro
