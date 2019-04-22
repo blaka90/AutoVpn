@@ -5,6 +5,8 @@ import subprocess
 import sys
 import pexpect
 import zipfile
+import keyring
+from getpass import getuser
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -24,11 +26,12 @@ class Window(QWidget):
 		self.vpn_list = [self.vpn_pl, self.vpn_de, self.vpn_us1, self.vpn_us2, self.vpn_ca, self.vpn_fr]
 		self.gen_list = ["vpnbook-pl226-", "vpnbook-de4-", "vpnbook-us1-", "vpnbook-us2-", "vpnbook-ca222-", "vpnbook-fr1-"]
 		self.vpn_gen_list = ["tcp80.ovpn", "tcp443.ovpn", "udp53.ovpn", "udp25000.ovpn"]
-
+		self.service_name = "AutoVpn"
 		self.start_style()
 		self.path()
 		self.vpn_auth_name = "vpnbook"
 		self.vpn_auth_password = self.grab_password()
+		self.user = getuser()
 		self.password = self.get_password()
 		self.get_profiles()
 		self.init_ui()
@@ -173,12 +176,14 @@ class Window(QWidget):
 		os.chdir(self.dir_name)
 
 	def get_password(self):
-		ask_pass, ok_pressed = QInputDialog.getText(self, "VPN Authorization", "Sudo Password: ", QLineEdit.Password, "")
-		if ok_pressed:
-			self.password = ask_pass
-			return self.password
+		if os.path.isfile("has_password"):
+			return keyring.get_password(self.service_name, self.user)
 		else:
-			sys.exit(10)
+			ask_pass, ok_pressed = QInputDialog.getText(self, "VPN Authorization", "Computer Password: ", QLineEdit.Password, "")
+			if ok_pressed:
+				keyring.set_password(self.service_name, self.user, ask_pass)
+				open('has_password', 'a').close()
+				return ask_pass
 
 	def get_profiles(self):
 		if not os.path.exists(self.dir_name + "/profiles/"):
