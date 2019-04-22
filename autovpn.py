@@ -63,6 +63,14 @@ class Window(QWidget):
 		self.ca = QRadioButton("Canada")
 		self.fr = QRadioButton("France")
 
+		self.country_group = QButtonGroup()
+		self.country_group.addButton(self.pl)
+		self.country_group.addButton(self.de)
+		self.country_group.addButton(self.us1)
+		self.country_group.addButton(self.us2)
+		self.country_group.addButton(self.ca)
+		self.country_group.addButton(self.fr)
+
 		self.tcp80 = QRadioButton("tcp80")
 		self.tcp443 = QRadioButton("tcp443")
 		self.udp53 = QRadioButton("udp53")
