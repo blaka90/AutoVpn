@@ -24,4 +24,8 @@ or
     sudo apt purge python3-pyqt5
 
 
+
 **Canada doesn't come with tcp443 for some reason it's not a bug**
+
+
+*--If you change your login password, delete has_password to be prompted again--*
