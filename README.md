@@ -22,3 +22,6 @@ cd into AutoVpn directory and
 or
 
     sudo apt purge python3-pyqt5
+
+
+**Canada doesn't come with tcp443 for some reason it's not a bug**
