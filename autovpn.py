@@ -35,6 +35,7 @@ class Window(QWidget):
 		self.password = self.get_password()
 		self.get_profiles()
 		self.init_ui()
+		self.start_ip = ""
 		self.print_ip()
 		self.chosen_vpn = ""
 		self.thread = QThreadPool()
@@ -220,7 +221,10 @@ class Window(QWidget):
 				for con in conn_list:
 					if con.isChecked():
 						self.no_go = False
-						self.chosen_vpn = self.gen_list[country_num] + self.vpn_gen_list[connection_num]
+						if (country == pro_list[4]) and (con == conn_list[1]):
+							self.chosen_vpn = self.gen_list[country_num] + self.vpn_gen_list[connection_num - 1]
+						else:
+							self.chosen_vpn = self.gen_list[country_num] + self.vpn_gen_list[connection_num]
 						return
 
 					connection_num += 1
@@ -249,6 +253,9 @@ class Window(QWidget):
 				print("\nCurrent ip:\n")
 				print(my_ip.text)
 				print("\n")
+		self.current_ip = my_ip.text
+		if not self.start_ip:
+			self.start_ip = my_ip.text
 
 	# this needs to be a thread
 	def start_vpn(self):
@@ -257,24 +264,76 @@ class Window(QWidget):
 				self.get_vpn_options()
 			if self.no_go:
 				return
-			self.vpn_button.setText("VPN: ON")
-			self.vpn_button.setStyleSheet('background-color: green; color: black')
-			# self.vpn_off.setStyleSheet('background-color: darkred; color: black')
+			self.vpn_button.setText("VPN: Starting...")
+			self.vpn_button.setStyleSheet('background-color: blue; color: black')
 			command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
-			print(command)
 			startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
 			startv.signals.printer.connect(self.print_ip)
 			self.thread.start(startv)
 			self.vpn_state = True
+			if self.start_check_change(0):
+				self.vpn_button.setText("VPN: ON")
+				self.vpn_button.setStyleSheet('background-color: green; color: black')
 		else:
 			self.file_picked = False
-			# self.vpn_off.setStyleSheet('background-color: green; color: black')
-			self.vpn_button.setText("VPN: OFF")
-			self.vpn_button.setStyleSheet('background-color: darkred; color: black')
+			self.vpn_button.setText("VPN: Stopping...")
+			self.vpn_button.setStyleSheet('background-color: blue; color: black')
 			stopv = StopVpn(self.password)
 			stopv.signals.printer.connect(self.print_ip)
 			self.thread.start(stopv)
 			self.vpn_state = False
+			if self.stop_check_change():
+				self.vpn_button.setText("VPN: OFF")
+				self.vpn_button.setStyleSheet('background-color: darkred; color: black')
+
+	def stop_check_change(self):
+		if self.start_ip != self.current_ip:
+			QTest.qWait(1000)
+			self.print_ip()
+			return self.stop_check_change()
+		else:
+			return True
+
+	def start_check_change(self, counter):
+		counter += 1
+		if counter == 10:
+			self.vpn_button.setText("VPN: Failed")
+			self.vpn_button.setStyleSheet('background-color: red; color: black')
+			QTest.qWait(3000)
+			sys.exit(10)
+		if self.start_ip == self.current_ip:
+			QTest.qWait(2000)
+			self.print_ip()
+			return self.start_check_change(counter)
+		else:
+			return True
+
+	def no_thread_exit(self):
+		p_name = "openvpn"
+		p = subprocess.Popen(['pidof', p_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		out, err = p.communicate()
+		print(out.decode())
+		if not out:
+			sys.exit(200)
+		else:
+			shell = pexpect.spawn("sudo kill {}".format(out.decode()))
+			shell.expect('.*password for .*?: ')
+			shell.sendline(self.password)
+			shell.expect(pexpect.EOF, timeout=None)
+			cmd_show_data = shell.before
+			cmd_output = cmd_show_data.split(b'\r\n')
+			for data in cmd_output:
+				print(data.decode())
+
+	def closeEvent(self, event):
+		reply = QMessageBox.question(self, 'Closing VPN', "Are you sure you want to quit?", QMessageBox.Yes |
+		                             QMessageBox.No, QMessageBox.No)
+		if reply == QMessageBox.Yes:
+			self.no_thread_exit()
+			event.accept()
+			sys.exit(0)
+		else:
+			event.ignore()
 
 
 class WorkerSignals(QObject):
@@ -303,7 +362,7 @@ class StopVpn(QRunnable):
 		cmd_output = cmd_show_data.split(b'\r\n')
 		for data in cmd_output:
 			print(data.decode())
-		print("\n[*]--VPN Process Killed--\n")
+		print("\n[*]--VPN Process Killed: {} --\n".format(out.decode()))
 
 
 class StartVpn(QRunnable):
@@ -324,8 +383,8 @@ class StartVpn(QRunnable):
 		shell.sendline(self.vpn_auth_name)
 		shell.expect("Enter Auth Password:")
 		shell.sendline(self.vpn_auth_password)
-		QTest.qWait(10000)
-		self.signals.printer.emit()
+		# QTest.qWait(10000)
+		# self.signals.printer.emit()
 		shell.expect(pexpect.EOF, timeout=None)
 		cmd_show_data = shell.before
 		cmd_output = cmd_show_data.split(b'\r\n')
