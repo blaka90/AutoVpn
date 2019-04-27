@@ -34,8 +34,10 @@ class Window(QWidget):
 		self.user = getuser()
 		self.password = self.get_password()
 		self.get_profiles()
+		self.check_running()
 		self.init_ui()
 		self.start_ip = ""
+		self.alt_print = 0
 		self.print_ip()
 		self.chosen_vpn = ""
 		self.thread = QThreadPool()
@@ -238,21 +240,33 @@ class Window(QWidget):
 		zfile.extractall(path=self.dir_name+"/profiles/")
 		zfile.close()
 
+	def check_running(self):
+		p_name = "openvpn"
+		p = subprocess.Popen(['pidof', p_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		out, err = p.communicate()
+		print(out.decode())
+		if not out:
+			self.vpn_state = False
+			# return False
+		else:
+			self.no_thread_exit()
+
 	def print_ip(self):
-		my_ip = requests.get("https://api.ipify.org")
+		if self.alt_print == 0:
+			my_ip = requests.get("https://api.ipify.org")
+			self.alt_print = 1
+		else:
+			my_ip = requests.get("http://ipecho.net/plain?")
+			self.alt_print = 0
+
 		if str(my_ip) == "<Response [200]>":
 			self.ip_label.setText("Current IP:        " + my_ip.text)
 			print("\nCurrent ip:\n")
 			print(my_ip.text)
 			print("\n")
 		else:
-			print("trying second option")
-			my_ip = requests.get("http://ipecho.net/plain?")
-			if str(my_ip) == "<Response [200]>":
-				self.ip_label.setText("Current IP:        " + my_ip.text)
-				print("\nCurrent ip:\n")
-				print(my_ip.text)
-				print("\n")
+			print("Failed to get ip address")
+			return self.print_ip()
 		self.current_ip = my_ip.text
 		if not self.start_ip:
 			self.start_ip = my_ip.text
@@ -300,7 +314,7 @@ class Window(QWidget):
 			self.vpn_button.setText("VPN: Failed")
 			self.vpn_button.setStyleSheet('background-color: red; color: black')
 			QTest.qWait(3000)
-			sys.exit(10)
+			self.no_thread_exit()
 		if self.start_ip == self.current_ip:
 			QTest.qWait(2000)
 			self.print_ip()
@@ -324,6 +338,7 @@ class Window(QWidget):
 			cmd_output = cmd_show_data.split(b'\r\n')
 			for data in cmd_output:
 				print(data.decode())
+			sys.exit(10)
 
 	def closeEvent(self, event):
 		reply = QMessageBox.question(self, 'Closing VPN', "Are you sure you want to quit?", QMessageBox.Yes |
