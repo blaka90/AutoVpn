@@ -1,6 +1,6 @@
 # AutoVpn
 
-Gui for starting/stopping vpnbooks openvpn servers 
+Gui for starting/stopping vpnbooks openvpn servers
 
 Linux only
 
@@ -29,3 +29,12 @@ or
 
 
 *--If you change your login password, delete has_password to be prompted again--*
+
+
+if it keeps failing it means vpnbook hasn't tweeted their new password yet(the only way i can scrape the password), if this occurs:
+
+- go to www.vpnbook.com, under OpenVPN tab find password at bottom
+
+- go to autovpn/manual_pasword.txt and manual type password and save
+
+AutoVpn will always try scrape for password first but if that fails then fallback to manual_pasword.txt

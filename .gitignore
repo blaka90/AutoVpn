@@ -3,3 +3,4 @@ __pycache__
 /profiles/vpnbook*
 /profiles/VPNBook*
 has_password
+manual_password.txt
