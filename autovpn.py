@@ -189,7 +189,6 @@ class Window(QWidget):
             f.close()
         print(passy)
         self.vpn_auth_password = passy
-        return
 
     def get_password(self):
         if os.path.isfile("has_password"):
@@ -296,55 +295,47 @@ class Window(QWidget):
             command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
             startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
             startv.signals.printer.connect(self.print_ip)
+            startv.signals.check_on.connect(self.print_start_check)
+            startv.signals.check_retry.connect(self.retry_check)
             self.thread.start(startv)
             self.vpn_state = True
-            if self.start_check_change(0):
-                self.vpn_button.setText("VPN: ON")
-                self.vpn_button.setStyleSheet('background-color: green; color: black')
         else:
             self.file_picked = False
             self.vpn_button.setText("VPN: Stopping...")
             self.vpn_button.setStyleSheet('background-color: blue; color: black')
+            QTest.qWait(2000)
             stopv = StopVpn(self.password)
             stopv.signals.printer.connect(self.print_ip)
+            stopv.signals.check_off.connect(self.print_stop_check)
             self.thread.start(stopv)
             self.vpn_state = False
-            if self.stop_check_change():
-                self.vpn_button.setText("VPN: OFF")
-                self.vpn_button.setStyleSheet('background-color: darkred; color: black')
 
-    def stop_check_change(self):
-        if self.start_ip != self.current_ip:
-            QTest.qWait(1000)
-            self.print_ip()
-            return self.stop_check_change()
-        else:
-            return True
+    def print_stop_check(self):
+        self.vpn_button.setText("VPN: OFF")
+        self.vpn_button.setStyleSheet('background-color: darkred; color: black')
 
-    def start_check_change(self, counter):
-        counter += 1
-        if counter == 5:
-            self.vpn_button.setText("VPN: Failed")
-            self.vpn_button.setStyleSheet('background-color: red; color: black')
-            QTest.qWait(3000)
-            self.vpn_button.setText("VPN: Trying Manual")
-            self.vpn_button.setStyleSheet('background-color: blue; color: black')
-            QTest.qWait(2000)
-            self.try_manual_password()
-            command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
-            startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
-            startv.signals.printer.connect(self.print_ip)
-            self.thread.start(startv)
-            self.vpn_state = True
-            if self.start_check_change(0):
-                self.vpn_button.setText("VPN: ON")
-                self.vpn_button.setStyleSheet('background-color: green; color: black')
-        if self.start_ip == self.current_ip:
-            QTest.qWait(2000)
-            self.print_ip()
-            return self.start_check_change(counter)
-        else:
-            return True
+    def print_start_check(self):
+        self.vpn_button.setText("VPN: ON")
+        self.vpn_button.setStyleSheet('background-color: green; color: black')
+
+    def retry_check(self):
+        self.vpn_button.setText("VPN: Failed")
+        self.vpn_button.setStyleSheet('background-color: red; color: black')
+        QTest.qWait(3000)
+        self.vpn_button.setText("VPN: Trying Manual")
+        self.vpn_button.setStyleSheet('background-color: blue; color: black')
+        QTest.qWait(2000)
+        self.try_manual_password()
+        print("just before no_exit_thread()")
+        # self.no_thread_exit()
+        print("just about to start second start thread")
+        command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
+        startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
+        startv.signals.printer.connect(self.print_ip)
+        startv.signals.check_on.connect(self.print_start_check)
+        startv.signals.check_retry.connect(self.retry_check)
+        self.thread.start(startv)
+        self.vpn_state = True
 
     def no_thread_exit(self):
         p_name = "openvpn"
@@ -365,8 +356,9 @@ class Window(QWidget):
             sys.exit(10)
 
     def closeEvent(self, event):
-        reply = QMessageBox.question(self, 'Closing VPN', "Are you sure you want to quit?", QMessageBox.Yes |
-                                     QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, 'Closing VPN', "Are you sure you want to quit?",
+                                     QMessageBox.Yes | QMessageBox.No,
+                                     QMessageBox.No)
         if reply == QMessageBox.Yes:
             self.no_thread_exit()
             event.accept()
@@ -377,6 +369,9 @@ class Window(QWidget):
 
 class WorkerSignals(QObject):
     printer = pyqtSignal()
+    check_on = pyqtSignal()
+    check_off = pyqtSignal()
+    check_retry = pyqtSignal()
 
 
 class StopVpn(QRunnable):
@@ -384,6 +379,9 @@ class StopVpn(QRunnable):
     def __init__(self, passy):
         QRunnable.__init__(self)
         self.password = passy
+        self.alt_print = 0
+        self.start_ip = ""
+        self.check_ip()
         self.signals = WorkerSignals()
 
     def run(self):
@@ -396,12 +394,34 @@ class StopVpn(QRunnable):
         shell.sendline(self.password)
         QTest.qWait(3000)
         self.signals.printer.emit()
+        self.stop_check_change()
         shell.expect(pexpect.EOF, timeout=None)
         cmd_show_data = shell.before
         cmd_output = cmd_show_data.split(b'\r\n')
         for data in cmd_output:
             print(data.decode())
         print("\n[*]--VPN Process Killed: {} --\n".format(out.decode()))
+
+    def stop_check_change(self):
+        if self.start_ip != self.current_ip:
+            QTest.qWait(1000)
+            self.check_ip()
+            return self.stop_check_change()
+        else:
+            return self.signals.check_off.emit()
+
+    def check_ip(self):
+        if self.alt_print == 0:
+            my_ip = requests.get("https://api.ipify.org")
+            self.alt_print = 1
+        else:
+            my_ip = requests.get("http://ipecho.net/plain?")
+            self.alt_print = 0
+
+        if str(my_ip) == "<Response [200]>":
+            self.current_ip = my_ip.text
+        if not self.start_ip:
+            self.start_ip = my_ip.text
 
 
 class StartVpn(QRunnable):
@@ -412,6 +432,9 @@ class StartVpn(QRunnable):
         self.password = password
         self.vpn_auth_name = vpn_name
         self.vpn_auth_password = vpn_password
+        self.alt_print = 0
+        self.start_ip = ""
+        self.check_ip()
         self.signals = WorkerSignals()
 
     def run(self):
@@ -422,13 +445,38 @@ class StartVpn(QRunnable):
         shell.sendline(self.vpn_auth_name)
         shell.expect("Enter Auth Password:")
         shell.sendline(self.vpn_auth_password)
-        # QTest.qWait(10000)
-        # self.signals.printer.emit()
+        QTest.qWait(10000)
+        self.signals.printer.emit()
+        self.start_check_change(0)
         shell.expect(pexpect.EOF, timeout=None)
         cmd_show_data = shell.before
         cmd_output = cmd_show_data.split(b'\r\n')
         for data in cmd_output:
             print(data.decode())
+
+    def start_check_change(self, counter):
+        counter += 1
+        if counter == 10:
+            return self.signals.check_retry.emit()
+        if self.start_ip == self.current_ip:
+            QTest.qWait(2000)
+            self.check_ip()
+            return self.start_check_change(counter)
+        else:
+            return self.signals.check_on.emit()
+
+    def check_ip(self):
+        if self.alt_print == 0:
+            my_ip = requests.get("https://api.ipify.org")
+            self.alt_print = 1
+        else:
+            my_ip = requests.get("http://ipecho.net/plain?")
+            self.alt_print = 0
+
+        if str(my_ip) == "<Response [200]>":
+            self.current_ip = my_ip.text
+        if not self.start_ip:
+            self.start_ip = my_ip.text
 
 
 class BrowserSignal(QObject):
