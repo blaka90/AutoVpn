@@ -35,10 +35,10 @@ class Window(QWidget):
         self.password = self.get_password()
         self.get_profiles()
         self.check_running()
+        self.pip = PrintIp()
         self.init_ui()
         self.start_ip = ""
         self.alt_print = 0
-        self.print_ip()
         self.chosen_vpn = ""
         self.thread = QThreadPool()
         self.file_picked = False
@@ -55,7 +55,7 @@ class Window(QWidget):
         self.ip_label = QLabel(self)
 
         self.refresh_ip = QPushButton("refresh")
-        self.refresh_ip.clicked.connect(self.print_ip)
+        self.refresh_ip.clicked.connect(self.pip.print_ip)
         self.refresh_ip.setFixedWidth(200)
 
         self.file_brow = QPushButton("Choose")
@@ -263,26 +263,6 @@ class Window(QWidget):
         else:
             self.no_thread_exit()
 
-    def print_ip(self):
-        if self.alt_print == 0:
-            my_ip = requests.get("https://api.ipify.org")
-            self.alt_print = 1
-        else:
-            my_ip = requests.get("http://ipecho.net/plain?")
-            self.alt_print = 0
-
-        if str(my_ip) == "<Response [200]>":
-            self.ip_label.setText("Current IP:        " + my_ip.text)
-            print("\nCurrent ip:\n")
-            print(my_ip.text)
-            print("\n")
-        else:
-            print("Failed to get ip address")
-            return self.print_ip()
-        self.current_ip = my_ip.text
-        if not self.start_ip:
-            self.start_ip = my_ip.text
-
     # this needs to be a thread
     def start_vpn(self):
         if not self.vpn_state:
@@ -294,7 +274,7 @@ class Window(QWidget):
             self.vpn_button.setStyleSheet('background-color: blue; color: black')
             command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
             startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
-            startv.signals.printer.connect(self.print_ip)
+            startv.signals.printer.connect(self.pip.print_ip)
             startv.signals.check_on.connect(self.print_start_check)
             startv.signals.check_retry.connect(self.retry_check)
             self.thread.start(startv)
@@ -305,7 +285,7 @@ class Window(QWidget):
             self.vpn_button.setStyleSheet('background-color: blue; color: black')
             QTest.qWait(2000)
             stopv = StopVpn(self.password)
-            stopv.signals.printer.connect(self.print_ip)
+            stopv.signals.printer.connect(self.pip.print_ip)
             stopv.signals.check_off.connect(self.print_stop_check)
             self.thread.start(stopv)
             self.vpn_state = False
@@ -331,7 +311,7 @@ class Window(QWidget):
         print("just about to start second start thread")
         command = "sudo openvpn --config " + self.dir_name + "/profiles/" + self.chosen_vpn
         startv = StartVpn(command, self.password, self.vpn_auth_name, self.vpn_auth_password)
-        startv.signals.printer.connect(self.print_ip)
+        startv.signals.printer.connect(self.pip.print_ip)
         startv.signals.check_on.connect(self.print_start_check)
         startv.signals.check_retry.connect(self.retry_check)
         self.thread.start(startv)
@@ -374,15 +354,38 @@ class WorkerSignals(QObject):
     check_retry = pyqtSignal()
 
 
+class PrintIp:
+    def __init__(self):
+        self.alt_print = 0
+        self.start_ip = ""
+        self.current_ip = ""
+        self.print_ip()
+
+    def print_ip(self):
+        if self.alt_print == 0:
+            my_ip = requests.get("https://api.ipify.org")
+            self.alt_print = 1
+        else:
+            my_ip = requests.get("http://ipecho.net/plain?")
+            self.alt_print = 0
+
+        if str(my_ip) == "<Response [200]>":
+            self.current_ip = my_ip.text
+            # self.ip_label.setText("Current IP:        " + my_ip.text)
+            print("\nCurrent ip:\n")
+            print(my_ip.text)
+            print("\n")
+        if not self.start_ip:
+            self.start_ip = my_ip.text
+
+
 class StopVpn(QRunnable):
 
     def __init__(self, passy):
         QRunnable.__init__(self)
         self.password = passy
-        self.alt_print = 0
-        self.start_ip = ""
-        self.check_ip()
         self.signals = WorkerSignals()
+        self.pip = PrintIp()
 
     def run(self):
         p_name = "openvpn"
@@ -403,25 +406,12 @@ class StopVpn(QRunnable):
         print("\n[*]--VPN Process Killed: {} --\n".format(out.decode()))
 
     def stop_check_change(self):
-        if self.start_ip != self.current_ip:
+        if self.pip.start_ip != self.pip.current_ip:
             QTest.qWait(1000)
-            self.check_ip()
+            self.pip.print_ip()
             return self.stop_check_change()
         else:
             return self.signals.check_off.emit()
-
-    def check_ip(self):
-        if self.alt_print == 0:
-            my_ip = requests.get("https://api.ipify.org")
-            self.alt_print = 1
-        else:
-            my_ip = requests.get("http://ipecho.net/plain?")
-            self.alt_print = 0
-
-        if str(my_ip) == "<Response [200]>":
-            self.current_ip = my_ip.text
-        if not self.start_ip:
-            self.start_ip = my_ip.text
 
 
 class StartVpn(QRunnable):
@@ -432,9 +422,7 @@ class StartVpn(QRunnable):
         self.password = password
         self.vpn_auth_name = vpn_name
         self.vpn_auth_password = vpn_password
-        self.alt_print = 0
-        self.start_ip = ""
-        self.check_ip()
+        self.pip = PrintIp()
         self.signals = WorkerSignals()
 
     def run(self):
@@ -458,25 +446,12 @@ class StartVpn(QRunnable):
         counter += 1
         if counter == 10:
             return self.signals.check_retry.emit()
-        if self.start_ip == self.current_ip:
+        if self.pip.start_ip == self.pip.current_ip:
             QTest.qWait(2000)
-            self.check_ip()
+            self.pip.print_ip()
             return self.start_check_change(counter)
         else:
             return self.signals.check_on.emit()
-
-    def check_ip(self):
-        if self.alt_print == 0:
-            my_ip = requests.get("https://api.ipify.org")
-            self.alt_print = 1
-        else:
-            my_ip = requests.get("http://ipecho.net/plain?")
-            self.alt_print = 0
-
-        if str(my_ip) == "<Response [200]>":
-            self.current_ip = my_ip.text
-        if not self.start_ip:
-            self.start_ip = my_ip.text
 
 
 class BrowserSignal(QObject):
