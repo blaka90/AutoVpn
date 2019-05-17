@@ -37,8 +37,6 @@ class Window(QWidget):
         self.check_running()
         self.pip = PrintIp()
         self.init_ui()
-        self.start_ip = ""
-        self.alt_print = 0
         self.chosen_vpn = ""
         self.thread = QThreadPool()
         self.file_picked = False
