@@ -35,6 +35,6 @@ if it keeps failing it means vpnbook hasn't tweeted their new password yet(the o
 
 - go to www.vpnbook.com, under OpenVPN tab find password at bottom
 
-- go to autovpn/manual_pasword.txt and manual type password and save
+- go to autovpn/manual_password.txt and manual type password and save
 
-AutoVpn will always try scrape for password first but if that fails then fallback to manual_pasword.txt
+AutoVpn will always try scrape for password first but if that fails then fallback to manual_password.txt
