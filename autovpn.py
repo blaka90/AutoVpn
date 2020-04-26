@@ -47,7 +47,7 @@ class Window(QWidget):
     def init_ui(self):
         # set the name, icon and size of main window
         self.setWindowTitle("AutoVpn")
-        # self.setWindowIcon(QIcon(".png"))
+        self.setWindowIcon(QIcon("autovpn.png"))
         self.setGeometry(0, 0, 200, 100)
 
         self.ip_label = QLabel(self)
